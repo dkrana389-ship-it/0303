@@ -1,0 +1,61 @@
+
+name: Build Call Report APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create Android Project
+        run: |
+          flutter create --org com.deepinnovations --project-name call_history --platforms=android .
+
+      - name: Copy App Files
+        run: |
+          rm -rf test
+          cp app_src/pubspec.yaml pubspec.yaml
+          cp app_src/lib/main.dart lib/main.dart
+          cp app_src/android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/kotlin/com/deepinnovations/call_history
+          cp app_src/android/kotlin/*.kt android/app/src/main/kotlin/com/deepinnovations/call_history/
+
+      - name: Add Start.io SDK
+        run: |
+          if [ -f android/app/build.gradle.kts ]; then
+            printf '\ndependencies {\n    implementation("com.startapp:inapp-sdk:5.+")\n}\n' >> android/app/build.gradle.kts
+          else
+            printf "\ndependencies {\n    implementation 'com.startapp:inapp-sdk:5.+'\n}\n" >> android/app/build.gradle
+          fi
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release --no-shrink
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Call-Report-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
